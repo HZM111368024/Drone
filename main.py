@@ -5,7 +5,6 @@ Simple script for take off and control with arrow keys
 import time
 from dronekit import connect, VehicleMode, LocationGlobalRelative, Command, LocationGlobal
 from pymavlink import mavutil
-import serial
 
 # - Importing Tkinter: sudo apt-get install python-tk
 import tkinter as tk
@@ -15,10 +14,10 @@ from tkinter import font
 
 # -- Connect to the vehicle
 print('Connecting...')
-vehicle = connect("tcp:127.0.0.1:5763")
+vehicle = connect("tcp:127.0.0.1:5760")
 
 # -- Set up the commanded flying speed
-gnd_speed = 1  # [m/s]
+gnd_speed = 0.2  # [m/s]
 
 # - Read the keyboard with tkinter
 root = tk.Tk()
@@ -26,7 +25,7 @@ root.geometry("800x400")  # Size of the window
 root.title("SITL Controller")  # Adding a title
 
 labelfont = font.Font(family="microsoft yahe", size=12, weight=font.BOLD)
-labelword = ["Q", "W", "E", "A", "S", "D", "UP", "DOWN", "M"]
+labelword = ["Q", "W", "E", "A", "S", "D", "UP", "DOWN", "M", "Alarm"]
 labellist = []
 
 
@@ -100,6 +99,13 @@ def condition_yaw(heading, relative, direction):
     vehicle.send_mavlink(msg)
 
 
+def relay():
+    if vehicle.channels['7'] == 3000:
+        vehicle.channels.overrides = {'7': 300}
+    elif vehicle.channels['7'] == 300:
+        vehicle.channels.overrides = {'7': 3000}
+
+
 # -- Key event function
 def key(event):
     if event.char == event.keysym:  # -- standard keys
@@ -134,6 +140,9 @@ def key(event):
             mode()
             print("Switch mode")
             labellist[8].config(bg="firebrick4")
+        elif event.keysym == '1':
+            relay()
+
     else:  # -- non standard keys
         if event.keysym == 'Up':
             set_velocity_body(vehicle, 0, 0, -gnd_speed)
@@ -186,6 +195,13 @@ attitude_label = tk.Label(root,  # 文字標示所在視窗
                           fg="white",
                           width=15, height=2)  # 文字標示尺寸
 
+alarm_label = tk.Label(root,  # 文字標示所在視窗
+                       text="",  # 顯示文字
+                       bg="white",  # 背景顏色
+                       font=labelfont,  # 字型與大小
+                       fg="red",
+                       width=15, height=2)  # 文字標示尺寸
+
 
 def show_mode():
     mode_label.config(text="Mode : " + str(vehicle.mode.name))
@@ -196,9 +212,22 @@ def show_armde():
     armde_label.config(text="Armde : " + str(vehicle.armed))
     root.after(1000, show_armde)  # 視窗每隔 1000 毫秒再次執行一次 showarmde()
 
+
+def show_alarm():
+    print(vehicle.channels['7'])
+    if vehicle.channels['7'] == 300:
+        relay_status="LOW"
+    else:
+        relay_status="HIGH"
+
+    alarm_label.config(text="Alarm : "+relay_status)
+    root.after(1000, show_alarm)  # 視窗每隔 1000 毫秒再次執行一次 showarmde()
+
+
 # -- 排版
-mode_label.grid(row=2, column=0, )
+mode_label.grid(row=2, column=0)
 armde_label.grid(row=3, column=0)
+alarm_label.grid(row=4, column=0)
 labellist[0].grid(row=0, column=0, padx=10, pady=30)
 labellist[1].grid(row=0, column=1, padx=10, pady=30)
 labellist[2].grid(row=0, column=2, padx=10, pady=30)
@@ -211,6 +240,7 @@ labellist[8].grid(row=2, column=3, padx=90)
 
 # -- MAIN FUNCTION
 # - 起飛到三公尺
+vehicle.channels.overrides = {'7': 300}
 vehicle.mode = VehicleMode("GUIDED")
 arm_and_takeoff(3)
 
@@ -218,6 +248,8 @@ print(">> Control the drone with the arrow keys. Press r for RTL mode")
 # -- 顯示Drone資訊
 show_mode()
 show_armde()
+show_alarm()
+
 root.bind_all('<Key>', key)
 root.bind_all('<KeyRelease>', KeyRelease)
 root.mainloop()
