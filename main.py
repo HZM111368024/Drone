@@ -14,7 +14,7 @@ from tkinter import font
 
 # -- Connect to the vehicle
 print('Connecting...')
-vehicle = connect("tcp:127.0.0.1:5760")
+vehicle = connect("COM3", baud=57600)
 
 # -- Set up the commanded flying speed
 gnd_speed = 0.2  # [m/s]
@@ -27,6 +27,7 @@ root.title("SITL Controller")  # Adding a title
 labelfont = font.Font(family="microsoft yahe", size=12, weight=font.BOLD)
 labelword = ["Q", "W", "E", "A", "S", "D", "UP", "DOWN", "M", "Alarm"]
 labellist = []
+relay_status = 0
 
 
 # -- Define arm and takeoff
@@ -70,10 +71,10 @@ def set_velocity_body(vehicle, vx, vy, vz):
         0,
         0, 0,
         mavutil.mavlink.MAV_FRAME_BODY_NED,
-        0b0000111111000111,  # -- BITMASK -> Consider only the velocities
-        0, 0, 0,  # -- POSITION
-        vx, vy, vz,  # -- VELOCITY
-        0, 0, 0,  # -- ACCELERATIONS
+        0b0000111111000111,  # BITMASK -> Consider only the velocities
+        0, 0, 0,  # POSITION
+        vx, vy, vz,  # VELOCITY
+        0, 0, 0,  # ACCELERATIONS
         0, 0)
     vehicle.send_mavlink(msg)
     vehicle.flush()
@@ -97,17 +98,26 @@ def condition_yaw(heading, relative, direction):
         0, 0, 0)  # param 5 ~ 7 not used
     # send command to vehicle
     vehicle.send_mavlink(msg)
+    vehicle.flush()
 
 
-def relay():
-    if vehicle.channels['7'] == 3000:
-        vehicle.channels.overrides = {'7': 300}
-    elif vehicle.channels['7'] == 300:
-        vehicle.channels.overrides = {'7': 3000}
+def relay(num, status):
+    msg = vehicle.message_factory.command_long_encode(
+        0, 0,  # target system, target component
+        mavutil.mavlink.MAV_CMD_DO_SET_RELAY,  # command
+        0,  # confirmation
+        num,  # param 1, relay number
+        status,  # param 2, relay status
+        0, 0, 0, 0, 0
+    )
+    # send command to vehicle
+    vehicle.send_mavlink(msg)
+    vehicle.flush()
 
 
 # -- Key event function
 def key(event):
+    global relay_status
     if event.char == event.keysym:  # -- standard keys
         if event.keysym == 'r':
             print("r pressed >> Set the vehicle to RTL")
@@ -141,7 +151,12 @@ def key(event):
             print("Switch mode")
             labellist[8].config(bg="firebrick4")
         elif event.keysym == '1':
-            relay()
+            if relay_status == 0:
+                relay_status = 1
+                relay(0, relay_status)
+            else:
+                relay_status = 0
+                relay(0, relay_status)
 
     else:  # -- non standard keys
         if event.keysym == 'Up':
@@ -214,13 +229,12 @@ def show_armde():
 
 
 def show_alarm():
-    print(vehicle.channels['7'])
-    if vehicle.channels['7'] == 300:
-        relay_status="LOW"
+    if relay_status == 0:
+        alarm_status = "LOW"
     else:
-        relay_status="HIGH"
+        alarm_status = "HIGH"
 
-    alarm_label.config(text="Alarm : "+relay_status)
+    alarm_label.config(text="Alarm : " + alarm_status)
     root.after(1000, show_alarm)  # 視窗每隔 1000 毫秒再次執行一次 showarmde()
 
 
@@ -240,7 +254,7 @@ labellist[8].grid(row=2, column=3, padx=90)
 
 # -- MAIN FUNCTION
 # - 起飛到三公尺
-vehicle.channels.overrides = {'7': 300}
+
 vehicle.mode = VehicleMode("GUIDED")
 arm_and_takeoff(3)
 
