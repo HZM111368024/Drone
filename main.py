@@ -9,12 +9,13 @@ from pymavlink import mavutil
 # - Importing Tkinter: sudo apt-get install python-tk
 import tkinter as tk
 from tkinter import font
+import time
 
 # -- Label information
 
 # -- Connect to the vehicle
 print('Connecting...')
-vehicle = connect("COM3", baud=57600)
+vehicle = connect("COM10", baud=57600)
 
 # -- Set up the commanded flying speed
 gnd_speed = 0.2  # [m/s]
@@ -28,6 +29,7 @@ labelfont = font.Font(family="microsoft yahe", size=12, weight=font.BOLD)
 labelword = ["Q", "W", "E", "A", "S", "D", "UP", "DOWN", "M", "Alarm"]
 labellist = []
 relay_status = 0
+servo_pwm = 2400
 
 
 # -- Define arm and takeoff
@@ -115,9 +117,25 @@ def relay(num, status):
     vehicle.flush()
 
 
+def servo(num, PWM):
+    print(PWM)
+    msg = vehicle.message_factory.command_long_encode(
+        0, 0,  # target system, target component
+        mavutil.mavlink.MAV_CMD_DO_SET_SERVO,  # command
+        0,  # confirmation
+        num,  # param 1, relay number
+        PWM,  # param 2, relay status
+        0, 0, 0, 0, 0
+    )
+    # send command to vehicle
+    vehicle.send_mavlink(msg)
+    vehicle.flush()
+
+
 # -- Key event function
 def key(event):
     global relay_status
+    global servo_pwm
     if event.char == event.keysym:  # -- standard keys
         if event.keysym == 'r':
             print("r pressed >> Set the vehicle to RTL")
@@ -157,6 +175,16 @@ def key(event):
             else:
                 relay_status = 0
                 relay(0, relay_status)
+        elif event.keysym == '2':
+            servo_pwm += 30
+            if servo_pwm >= 2400:
+                servo_pwm = 2400
+            servo(9, servo_pwm)
+        elif event.keysym == '8':
+            servo_pwm -= 30
+            if servo_pwm <= 500:
+                servo_pwm = 500
+            servo(9, servo_pwm)
 
     else:  # -- non standard keys
         if event.keysym == 'Up':
@@ -256,7 +284,13 @@ labellist[8].grid(row=2, column=3, padx=90)
 # - 起飛到三公尺
 
 vehicle.mode = VehicleMode("GUIDED")
-arm_and_takeoff(3)
+# arm_and_takeoff(3)
+
+# check servo status
+servo(9, 500)
+time.sleep(0.5)
+servo(9, 2400)
+
 
 print(">> Control the drone with the arrow keys. Press r for RTL mode")
 # -- 顯示Drone資訊
