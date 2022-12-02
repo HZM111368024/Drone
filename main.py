@@ -29,7 +29,7 @@ labelfont = font.Font(family="microsoft yahe", size=12, weight=font.BOLD)
 labelword = ["Q", "W", "E", "A", "S", "D", "UP", "DOWN", "M", "Alarm"]
 labellist = []
 relay_status = 0
-servo_pwm = 2400
+servo_pwm = 2500
 
 
 # -- Define arm and takeoff
@@ -175,12 +175,12 @@ def key(event):
             else:
                 relay_status = 0
                 relay(0, relay_status)
-        elif event.keysym == '2':
-            servo_pwm += 30
-            if servo_pwm >= 2400:
-                servo_pwm = 2400
-            servo(9, servo_pwm)
         elif event.keysym == '8':
+            servo_pwm += 30
+            if servo_pwm >= 2500:
+                servo_pwm = 2500
+            servo(9, servo_pwm)
+        elif event.keysym == '2':
             servo_pwm -= 30
             if servo_pwm <= 500:
                 servo_pwm = 500
@@ -287,9 +287,8 @@ vehicle.mode = VehicleMode("GUIDED")
 # arm_and_takeoff(3)
 
 # check servo status
-servo(9, 500)
-time.sleep(0.5)
-servo(9, 2400)
+servo(9, 2500)
+
 
 
 print(">> Control the drone with the arrow keys. Press r for RTL mode")
