@@ -9,6 +9,7 @@ from pymavlink import mavutil
 # - Importing Tkinter: sudo apt-get install python-tk
 import tkinter as tk
 from tkinter import font
+from tkinter import ttk
 import time
 
 # -- Label information
@@ -58,7 +59,7 @@ def arm_and_takeoff(altitude):
 
 
 # -- Define the function for sending mavlink velocity command in body frame
-def set_velocity_body(vehicle, vx, vy, vz):
+def set_velocity_body(drone_id, vehicle, vx, vy, vz):
     """ Remember: vz is positive downward!!!
     http://ardupilot.org/dev/docs/copter-commands-in-guided-mode.html
 
@@ -73,7 +74,7 @@ def set_velocity_body(vehicle, vx, vy, vz):
     """
     msg = vehicle.message_factory.set_position_target_local_ned_encode(
         0,
-        0, 0,
+        drone_id, 0,
         mavutil.mavlink.MAV_FRAME_BODY_NED,
         0b0000111111000111,  # BITMASK -> Consider only the velocities
         0, 0, 0,  # POSITION
@@ -85,14 +86,14 @@ def set_velocity_body(vehicle, vx, vy, vz):
 
 
 # -- Control Drone yaw angle
-def condition_yaw(heading, relative, direction):
+def condition_yaw(drone_id, heading, relative, direction):
     if relative:
         is_relative = 1  # yaw relative to direction of travel
     else:
         is_relative = 0  # yaw is an absolute angle
     # create the CONDITION_YAW command using command_long_encode()
     msg = vehicle.message_factory.command_long_encode(
-        1, 1,  # target system, target component
+        drone_id, 0,  # target system, target component
         mavutil.mavlink.MAV_CMD_CONDITION_YAW,  # command
         0,  # confirmation
         heading,  # param 1, yaw in degrees
@@ -105,9 +106,9 @@ def condition_yaw(heading, relative, direction):
     vehicle.flush()
 
 
-def relay(num, status):
+def relay(drone_id, num, status):
     msg = vehicle.message_factory.command_long_encode(
-        2, 0,  # target system, target component
+        drone_id, 0,  # target system, target component
         mavutil.mavlink.MAV_CMD_DO_SET_RELAY,  # command
         0,  # confirmation
         num,  # param 1, relay number
@@ -119,10 +120,11 @@ def relay(num, status):
     vehicle.flush()
 
 
-def servo(num, PWM):
+def servo(drone_id, num, PWM):
+    print(drone_id)
     print(PWM)
     msg = vehicle.message_factory.command_long_encode(
-        0, 0,  # target system, target component
+        drone_id, 0,  # target system, target component
         mavutil.mavlink.MAV_CMD_DO_SET_SERVO,  # command
         0,  # confirmation
         num,  # param 1, servo number
@@ -150,58 +152,55 @@ def mode(drone_id, custom_Mode):
 
 # -- Key event function
 def key(event):
+    id = int(list({box.current()})[0])
     global relay_status
     global servo_pwm
     if event.char == event.keysym:  # -- standard keys
         if event.keysym == 'w' or event.keysym == 'W':
             print("往前")
-            set_velocity_body(vehicle, gnd_speed, 0, 0)
+            set_velocity_body(id, vehicle, gnd_speed, 0, 0)
             labellist[1].config(bg="firebrick4")
         elif event.keysym == 's' or event.keysym == 'S':
-            set_velocity_body(vehicle, -gnd_speed, 0, 0)
+            set_velocity_body(id, vehicle, -gnd_speed, 0, 0)
             print("往後")
             labellist[4].config(bg="firebrick4")
         elif event.keysym == 'a' or event.keysym == 'A':
-            set_velocity_body(vehicle, 0, -gnd_speed, 0)
+            set_velocity_body(id, vehicle, 0, -gnd_speed, 0)
             print("往左")
             labellist[3].config(bg="firebrick4")
         elif event.keysym == 'd' or event.keysym == 'D':
-            set_velocity_body(vehicle, 0, gnd_speed, 0)
+            set_velocity_body(id, vehicle, 0, gnd_speed, 0)
             print("往右")
             labellist[5].config(bg="firebrick4")
         elif event.keysym == 'q' or event.keysym == 'Q':
-            condition_yaw(10, True, -1)
+            condition_yaw(id, 10, True, -1)
             print("Yaw往左")
             labellist[0].config(bg="firebrick4")
         elif event.keysym == 'e' or event.keysym == 'E':
-            condition_yaw(10, True, 1)
+            condition_yaw(id, 10, True, 1)
             print("Yaw往右")
             labellist[2].config(bg="firebrick4")
         elif event.keysym == 'm' or event.keysym == 'M':
-            mode(2,4)
-            print("Switch drone2 mode")
+            mode(id, 4)
             labellist[8].config(bg="firebrick4")
-        elif event.keysym == 'n' or event.keysym == 'N':
-            mode(3,4)
-            print("Switch drone3 mode")
 
         elif event.keysym == '1':
             if relay_status == 0:
                 relay_status = 1
-                relay(0, relay_status)
+                relay(id, 0, relay_status)
             else:
                 relay_status = 0
-                relay(0, relay_status)
+                relay(id, 0, relay_status)
         elif event.keysym == '8':
             servo_pwm += 30
             if servo_pwm >= 2500:
                 servo_pwm = 2500
-            servo(9, servo_pwm)
+            servo(id, 9, servo_pwm)
         elif event.keysym == '2':
             servo_pwm -= 30
             if servo_pwm <= 500:
                 servo_pwm = 500
-            servo(9, servo_pwm)
+            servo(id, 9, servo_pwm)
 
     else:  # -- non standard keys
         if event.keysym == 'Up':
@@ -261,13 +260,17 @@ servo_label = tk.Label(root,  # 文字標示所在視窗
                        font=labelfont,  # 字型與大小
                        fg="white",
                        width=15, height=2)  # 文字標示尺寸
+
+
 def show_mode():
     mode_label.config(text="Mode : " + str(vehicle.mode.name))
     root.after(1000, show_mode)  # 視窗每隔 1000 毫秒再次執行一次 showmode()
 
+
 def show_armde():
     armde_label.config(text="Armde : " + str(vehicle.armed))
     root.after(1000, show_armde)  # 視窗每隔 1000 毫秒再次執行一次 showarmde()
+
 
 def show_alarm():
     if relay_status == 0:
@@ -278,14 +281,23 @@ def show_alarm():
     alarm_label.config(text="Alarm : " + alarm_status)
     root.after(1000, show_alarm)  # 視窗每隔 1000 毫秒再次執行一次 show_alarm()
 
+
 def show_servo():
-    servo_label.config(text="Servo angle : " + str(int(servo_pwm*180/2000-135)))
+    servo_label.config(text="Servo angle : " + str(int(servo_pwm * 180 / 2000 - 135)))
     root.after(1000, show_servo)  # 視窗每隔 1000 毫秒再次執行一次 show_servo()
+
+
+box = ttk.Combobox(root,
+                   width=15,
+                   values=['All Drone', 'Drone_001', 'Drone_002', 'Drone_003', 'Drone_004', 'Drone_005'],
+                   state='readonly')
 
 # 排版
 mode_label.grid(row=2, column=0)
 armde_label.grid(row=3, column=0)
 alarm_label.grid(row=4, column=0)
+box.grid(row=3, column=3)
+
 servo_label.grid(row=2, column=1)
 labellist[0].grid(row=0, column=0, padx=10, pady=30)
 labellist[1].grid(row=0, column=1, padx=10, pady=30)
@@ -304,7 +316,7 @@ vehicle.mode = VehicleMode("GUIDED")
 # arm_and_takeoff(3)
 
 # check servo status
-servo(9, 2500)
+servo(0, 9, 2500)
 
 print(">> Control the drone with the arrow keys. Press r for RTL mode")
 # 顯示Drone資訊
