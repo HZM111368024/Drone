@@ -3,7 +3,7 @@ Simple script for take off and control with arrow keys
 """
 
 import time
-from dronekit import connect, VehicleMode, LocationGlobalRelative, Command, LocationGlobal
+from dronekit import connect, VehicleMode
 from pymavlink import mavutil
 
 # - Importing Tkinter: sudo apt-get install python-tk
@@ -18,7 +18,7 @@ import time
 print('Connecting...')
 # vehicle = connect('tcp:127.0.0.1:5760', )
 # vehicle1 = connect('COM5', baud=57600)
-vehicle = connect('COM3', baud=57600)
+vehicle = mavutil.mavlink_connection('COM11', baud=57600)
 
 # -- Set up the commanded flying speed
 gnd_speed = 0.2  # [m/s]
@@ -33,7 +33,6 @@ labelword = ["Q", "W", "E", "A", "S", "D", "UP", "DOWN", "M", "Alarm"]
 labellist = []
 relay_status = 0
 servo_pwm = 2500
-
 
 # -- Define arm and takeoff
 def arm_and_takeoff(altitude):
@@ -121,35 +120,14 @@ def relay(drone_id, num, status):
 
 
 def servo(drone_id, num, PWM):
-    print(drone_id)
     print(PWM)
-    msg = vehicle.message_factory.command_long_encode(
-        drone_id, 0,  # target system, target component
-        mavutil.mavlink.MAV_CMD_DO_SET_SERVO,  # command
-        0,  # confirmation
-        num,  # param 1, servo number
-        PWM,  # param 2, servo status
-        0, 0, 0, 0, 0
-    )
-    # send command to vehicle
-    vehicle.send_mavlink(msg)
-    vehicle.flush()
+    vehicle.mav.command_long_send(drone_id, 0,
+                                  mavutil.mavlink.MAV_CMD_DO_SET_SERVO, 0, num, PWM, 0, 0, 0, 0, 0)
 
 
 def mode(drone_id, custom_Mode):
-    msg = vehicle.message_factory.command_long_encode(
-        drone_id, 0,  # target system, target component
-        mavutil.mavlink.MAV_CMD_DO_SET_MODE,  # command
-        0,  # confirmation
-        1,  # param 1, Mode
-        custom_Mode,  # param 2, Custom Mode
-        0, 0, 0, 0, 0
-    )
-    # send command to vehicle
-    vehicle.send_mavlink(msg)
-    vehicle.flush()
-
-
+    vehicle.mav.command_long_send(drone_id, 0,
+                                  mavutil.mavlink.MAV_CMD_DO_SET_MODE, 0, 1, custom_Mode, 0, 0, 0, 0, 0)
 # -- Key event function
 def key(event):
     id = int(list({box.current()})[0])
@@ -181,9 +159,10 @@ def key(event):
             print("Yaw往右")
             labellist[2].config(bg="firebrick4")
         elif event.keysym == 'm' or event.keysym == 'M':
-            mode(id, 4)
-            labellist[8].config(bg="firebrick4")
-
+                mode(id, 4)
+                labellist[8].config(bg="firebrick4")
+        elif event.keysym == 'n' or event.keysym == 'N':
+                mode(id, 9)
         elif event.keysym == '1':
             if relay_status == 0:
                 relay_status = 1
@@ -261,7 +240,7 @@ servo_label = tk.Label(root,  # 文字標示所在視窗
                        fg="white",
                        width=15, height=2)  # 文字標示尺寸
 
-
+"""
 def show_mode():
     mode_label.config(text="Mode : " + str(vehicle.mode.name))
     root.after(1000, show_mode)  # 視窗每隔 1000 毫秒再次執行一次 showmode()
@@ -285,7 +264,7 @@ def show_alarm():
 def show_servo():
     servo_label.config(text="Servo angle : " + str(int(servo_pwm * 180 / 2000 - 135)))
     root.after(1000, show_servo)  # 視窗每隔 1000 毫秒再次執行一次 show_servo()
-
+"""
 
 box = ttk.Combobox(root,
                    width=15,
@@ -317,14 +296,14 @@ vehicle.mode = VehicleMode("GUIDED")
 
 # check servo status
 servo(0, 9, 2500)
-
+"""
 print(">> Control the drone with the arrow keys. Press r for RTL mode")
 # 顯示Drone資訊
 show_mode()
 show_armde()
 show_alarm()
 show_servo()
-
+"""
 root.bind_all('<Key>', key)
 root.bind_all('<KeyRelease>', KeyRelease)
 root.mainloop()
